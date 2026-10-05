@@ -1,5 +1,8 @@
 import asyncio
 import logging
+import os
+
+from aiohttp import web
 
 from aiogram import Bot, Dispatcher, F
 from aiogram.filters import CommandStart
@@ -7,7 +10,12 @@ from aiogram.types import Message
 
 from config import BOT_TOKEN
 from keyboards import main_keyboard
-from cbu import get_usd_message, get_currency_message, get_currencies, format_number
+from cbu import (
+    get_usd_message,
+    get_currency_message,
+    get_currencies,
+    format_number,
+)
 
 
 logging.basicConfig(level=logging.INFO)
@@ -15,6 +23,10 @@ logging.basicConfig(level=logging.INFO)
 bot = Bot(token=BOT_TOKEN)
 dp = Dispatcher()
 
+
+# =========================
+# Telegram bot handlers
+# =========================
 
 @dp.message(CommandStart())
 async def start_handler(message: Message):
@@ -139,7 +151,55 @@ async def unknown_handler(message: Message):
     )
 
 
+# =========================
+# AIOHTTP SERVER
+# =========================
+
+async def health_check(request):
+    return web.Response(
+        text="Valyuta bot is running!"
+    )
+
+
+async def start_web_server():
+    app = web.Application()
+
+    # Render health check
+    app.router.add_get("/", health_check)
+    app.router.add_get("/health", health_check)
+
+    # Render bergan PORT
+    port = int(os.environ.get("PORT", 10000))
+
+    runner = web.AppRunner(app)
+    await runner.setup()
+
+    site = web.TCPSite(
+        runner,
+        host="0.0.0.0",
+        port=port
+    )
+
+    await site.start()
+
+    logging.info(
+        f"🌐 AIOHTTP server started on port {port}"
+    )
+
+    return runner
+
+
+# =========================
+# MAIN
+# =========================
+
 async def main():
+    # AIOHTTP serverni ishga tushirish
+    await start_web_server()
+
+    logging.info("🤖 Telegram bot polling started...")
+
+    # Telegram bot
     await dp.start_polling(bot)
 
 
